@@ -11,6 +11,10 @@ app.use(express.json());
 // Secret temporal para JWT (En producción se inyecta desde Vercel Environment Variables)
 const JWT_SECRET = process.env.JWT_SECRET || 'zero-trust-super-secret-key-2026';
 
+// Servir el frontend estático visual
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
+
 // Configuración recomendada para Vercel y Serverless Neon Postgres
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || "postgresql://neondb_owner:npg_5IEt2xbjKkUr@ep-proud-field-a49vdzd4-pooler.us-east-1.aws.neon.tech/neondb?sslmode=require",

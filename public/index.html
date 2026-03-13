@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Financiero Zero-Trust</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: white; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .card { background-color: #1e293b; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); width: 100%; max-width: 400px; }
+        h1 { font-size: 1.5rem; text-align: center; margin-bottom: 2rem; color: #38bdf8; }
+        input { width: 100%; padding: 0.75rem; margin-bottom: 1rem; border: 1px solid #334155; border-radius: 6px; background-color: #0f172a; color: white; box-sizing: border-box; }
+        button { width: 100%; padding: 0.75rem; background-color: #0284c7; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; transition: background-color 0.2s; }
+        button:hover { background-color: #0369a1; }
+        #resultado { margin-top: 1.5rem; padding: 1rem; background-color: #0f172a; border-radius: 6px; font-family: monospace; font-size: 0.875rem; white-space: pre-wrap; word-wrap: break-word; overflow-x: auto; display: none; border: 1px solid #334155; }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .link { display: block; text-align: center; margin-top: 1rem; color: #94a3b8; font-size: 0.875rem; text-decoration: none; }
+        .link:hover { color: white; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>Autenticación Zero-Trust</h1>
+        <p style="font-size: 0.875rem; color: #94a3b8; margin-bottom: 1.5rem; text-align: center;">Acceso restringido a DB de Neon</p>
+        
+        <input type="text" id="username" placeholder="Usuario (ej: gerente10, auditor)" value="gerente10">
+        <input type="password" id="password" placeholder="Contraseña (ej: 1234, admin)" value="1234">
+        
+        <button onclick="hacerLogin()">Conectar y Consultar API</button>
+
+        <div id="resultado"></div>
+        <a href="/api/clientes-ofuscados" target="_blank" class="link">Probar Endpoint Protegido (Dará Error intencional)</a>
+    </div>
+
+    <script>
+        async function hacerLogin() {
+            const user = document.getElementById('username').value;
+            const pass = document.getElementById('password').value;
+            const resDiv = document.getElementById('resultado');
+            
+            resDiv.style.display = 'block';
+            resDiv.innerHTML = '<span style="color: #94a3b8;">Conectando a Neon Serverless...</span>';
+
+            try {
+                // 1. LOGIN
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: user, password: pass })
+                });
+                
+                const data = await response.json();
+
+                if (!response.ok) {
+                    resDiv.innerHTML = `<span class="error">❌ Acceso Denegado: ${data.error}</span>`;
+                    return;
+                }
+
+                resDiv.innerHTML = `<span class="success">✅ Login Exitoso. Token JWT generado. Consultando transacciones con Role RLS...</span>`;
+
+                // 2. CONSULTAR TRANSACCIONES CON EL TOKEN
+                const authResponse = await fetch('/api/transacciones', {
+                    headers: { 'Authorization': `Bearer ${data.token}` }
+                });
+                
+                const authData = await authResponse.json();
+                
+                resDiv.innerHTML += `\n\n<span style="color: #38bdf8;">📊 Resultados BD (Vía PostgreSQL):</span>\n${JSON.stringify(authData, null, 2)}`;
+
+            } catch (error) {
+                resDiv.innerHTML = `<span class="error">❌ Error de Conexión: ${error.message}</span>`;
+            }
+        }
+    </script>
+</body>
+</html>
