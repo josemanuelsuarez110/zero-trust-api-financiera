@@ -38,38 +38,69 @@
             const user = document.getElementById('username').value;
             const pass = document.getElementById('password').value;
             const resDiv = document.getElementById('resultado');
-            
+
             resDiv.style.display = 'block';
-            resDiv.innerHTML = '<span style="color: #94a3b8;">Conectando a Neon Serverless...</span>';
+            resDiv.className = '';
+            resDiv.textContent = 'Conectando a Neon Serverless...';
 
             try {
-                // 1. LOGIN
                 const response = await fetch('/api/auth/login', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: user, password: pass })
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        username: user,
+                        password: pass
+                    })
                 });
-                
+
                 const data = await response.json();
 
                 if (!response.ok) {
-                    resDiv.innerHTML = `<span class="error">❌ Acceso Denegado: ${data.error}</span>`;
+                    resDiv.className = 'error';
+                    resDiv.textContent =
+                        `Acceso denegado: ${data.error}`;
                     return;
                 }
 
-                resDiv.innerHTML = `<span class="success">✅ Login Exitoso. Token JWT generado. Consultando transacciones con Role RLS...</span>`;
+                resDiv.className = 'success';
+                resDiv.textContent =
+                    'Login exitoso. JWT generado.\n' +
+                    'Consultando transacciones con PostgreSQL RLS...';
 
-                // 2. CONSULTAR TRANSACCIONES CON EL TOKEN
-                const authResponse = await fetch('/api/transacciones', {
-                    headers: { 'Authorization': `Bearer ${data.token}` }
-                });
-                
-                const authData = await authResponse.json();
-                
-                resDiv.innerHTML += `\n\n<span style="color: #38bdf8;">📊 Resultados BD (Vía PostgreSQL):</span>\n${JSON.stringify(authData, null, 2)}`;
+                const authResponse = await fetch(
+                    '/api/transacciones',
+                    {
+                        headers: {
+                            Authorization:
+                                `Bearer ${data.token}`
+                        }
+                    }
+                );
 
+                const authData =
+                    await authResponse.json();
+
+                if (!authResponse.ok) {
+                    resDiv.className = 'error';
+                    resDiv.textContent =
+                        `Error API: ${authData.error}`;
+                    return;
+                }
+
+                resDiv.className = '';
+                resDiv.textContent =
+                    'Resultados PostgreSQL / RLS:\n\n' +
+                    JSON.stringify(
+                        authData,
+                        null,
+                        2
+                    );
             } catch (error) {
-                resDiv.innerHTML = `<span class="error">❌ Error de Conexión: ${error.message}</span>`;
+                resDiv.className = 'error';
+                resDiv.textContent =
+                    `Error de conexión: ${error.message}`;
             }
         }
     </script>

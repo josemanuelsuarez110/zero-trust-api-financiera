@@ -1,20 +1,97 @@
-# Zero-Trust Financial API (Node.js + PostgreSQL)
+# Zero Trust API Financiera
 
-Este es el backend API REST para el **Sistema de Gestión Financiera "Zero-Trust"**, diseñado para integrarse con PostgreSQL (Neon Serverless) con validaciones directas en la base de datos utilizando JWT y Row-Level Security (RLS).
+Security-focused financial API demonstrating JWT authentication, role context injection and PostgreSQL Row-Level Security (RLS).
 
-## 🚀 Despliegue Rápido en Vercel
+## Architecture
 
-Puedes desplegar esta API directamente a tu cuenta de Vercel con un solo clic:
+Browser
+   |
+   v
+Express API
+   |
+   +-- JWT verification
+   +-- Role / branch context
+   |
+   v
+PostgreSQL / Neon
+   |
+   +-- SET LOCAL ROLE dummy_test
+   +-- Row-Level Security
+   |
+   v
+Authorized rows only
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%20%2F%2Fgithub.com%2Fjosemanuelsuarez110%2Fzero-trust-api-financiera&env=JWT_SECRET,DATABASE_URL)
+## Stack
 
-### Variables de Entorno Requeridas
-Al desplegar, Vercel te pedirá las siguientes variables de entorno:
-* `DATABASE_URL`: El connection string de tu base de datos Neon (Manten el sufijo `?sslmode=require`).
-* `JWT_SECRET`: Una clave secreta para firmar los JSON Web Tokens (ej. `mi-clave-super-secreta-2026`).
+- Node.js
+- Express
+- PostgreSQL
+- Neon Serverless
+- JSON Web Tokens
+- PostgreSQL Row-Level Security
+- Vanilla HTML / JavaScript demo UI
+- Vercel Serverless Functions
 
-## 🛡️ Características de Seguridad
-* **Autenticación Basada en Roles (RBAC):** Login ficticio integrado para testing rápido de permisos.
-* **Row-Level Security (RLS) en Postgres:** Inyección dinámica de variables de sesión (`app.current_rol` y `app.current_sucursal`) por cada consulta HTTP para garantizar aislamiento transaccional a nivel de base de datos.
-* **Anonimización Criptográfica:** Endpoints públicos que devuelven resultados ofuscados (con hash).
-* **Pool Configuration:** Optimizado para Vercel Serverless Functions y Edge (`max: 1`).
+## Security Model
+
+1. Every protected request requires a JWT.
+2. JWT identity and role are verified by the API.
+3. Role context is injected into PostgreSQL.
+4. PostgreSQL RLS decides which rows are visible.
+5. Authorization is enforced at the database layer.
+
+## Demo identities
+
+These accounts exist only for portfolio/testing purposes.
+
+| User | Password | Role |
+| --- | --- | --- |
+| gerente10 | 1234 | gerente_sucursal |
+| auditor | admin | auditor_regional |
+| cajero5 | 123 | cajero |
+| cliente | pass | cliente |
+
+Do not use this mock authentication model for real production accounts.
+
+## Required environment variables
+
+DATABASE_URL
+JWT_SECRET
+
+Never commit their values to Git.
+
+## Automated Security Verification
+
+Run:
+
+npm run test:security
+
+The test validates:
+
+- HTTP 401 when JWT is missing
+- HTTP 403 when JWT is invalid
+- branch manager restricted to branch 10
+- regional auditor receives multi-branch access
+- PostgreSQL RLS enforced end-to-end
+
+## Production
+
+https://zero-trust-api-financiera.vercel.app
+
+Health endpoint:
+
+/api/health
+
+Expected response:
+
+{
+  "ok": true,
+  "jwtConfigured": true,
+  "databaseConfigured": true
+}
+
+## Security Note
+
+This repository is a portfolio security laboratory. Authentication identities are intentionally mocked to demonstrate authorization and PostgreSQL RLS.
+
+A real production implementation should add a real identity provider, password hashing, rate limiting, account lifecycle controls and centralized security audit logging.

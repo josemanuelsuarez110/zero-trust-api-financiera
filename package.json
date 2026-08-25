@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:security": "node scripts/verify-rls.js"
+    "test:security": "node scripts/verify-rls.js",
+    "check": "node --check index.js && node --check scripts/verify-rls.js",
+    "security": "npm audit --audit-level=high && npm run test:security"
   },
   "keywords": [],
   "author": "",
