@@ -10,27 +10,38 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-const JWT_SECRET = process.env.JWT_SECRET;
-const DATABASE_URL = process.env.DATABASE_URL;
+const JWT_SECRET = process.env.JWT_SECRET || null;
+const DATABASE_URL = process.env.DATABASE_URL || null;
 
-if (!JWT_SECRET) {
-  throw new Error('JWT_SECRET no está configurado.');
-}
+// Do not crash the serverless function at module load time.
+// Configuration errors are returned by the endpoint that needs them.
+const pool = DATABASE_URL
+  ? new Pool({
+      connectionString: DATABASE_URL,
+      ssl: { rejectUnauthorized: true },
+      max: 1,
+    })
+  : null;
 
-if (!DATABASE_URL) {
-  throw new Error('DATABASE_URL no está configurado.');
-}
-
-const pool = new Pool({
-  connectionString: DATABASE_URL,
-  ssl: { rejectUnauthorized: true },
-  max: 1,
+app.get('/api/health', (_req, res) => {
+  return res.json({
+    ok: true,
+    jwtConfigured: Boolean(JWT_SECRET),
+    databaseConfigured: Boolean(DATABASE_URL),
+  });
 });
 
 // ==========================================
 // 1. ENDPOINT DE AUTENTICACIÓN FICTICIA (Mock)
 // ==========================================
 app.post('/api/auth/login', (req, res) => {
+  if (!JWT_SECRET) {
+    return res.status(500).json({
+      error: 'Configuración incompleta',
+      missing: 'JWT_SECRET',
+    });
+  }
+
   const { username, password } = req.body;
 
   let role = 'cliente';
@@ -68,6 +79,20 @@ app.post('/api/auth/login', (req, res) => {
 // 2. MIDDLEWARE ZERO-TRUST (JWT + RLS)
 // ==========================================
 const authenticateAndSetRLS = async (req, res, next) => {
+  if (!JWT_SECRET) {
+    return res.status(500).json({
+      error: 'Configuración incompleta',
+      missing: 'JWT_SECRET',
+    });
+  }
+
+  if (!DATABASE_URL || !pool) {
+    return res.status(500).json({
+      error: 'Configuración incompleta',
+      missing: 'DATABASE_URL',
+    });
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -78,7 +103,6 @@ const authenticateAndSetRLS = async (req, res, next) => {
 
   const token = authHeader.slice(7).trim();
 
-  // JWT errors are handled independently from database/RLS errors.
   try {
     req.user = jwt.verify(token, JWT_SECRET);
   } catch (error) {
@@ -94,7 +118,6 @@ const authenticateAndSetRLS = async (req, res, next) => {
     client = await pool.connect();
     req.dbClient = client;
 
-    // SET LOCAL only has transaction-local semantics inside BEGIN/COMMIT.
     await client.query('BEGIN');
     await client.query('SET LOCAL ROLE dummy_test');
 
@@ -121,6 +144,8 @@ const authenticateAndSetRLS = async (req, res, next) => {
 
     return res.status(500).json({
       error: 'Error configurando contexto Zero-Trust',
+      code: error.code || null,
+      detail: process.env.NODE_ENV === 'production' ? undefined : error.message,
     });
   }
 };
@@ -149,6 +174,7 @@ app.get('/api/transacciones', authenticateAndSetRLS, async (req, res) => {
 
     return res.status(500).json({
       error: 'Error consultando transacciones',
+      code: error.code || null,
     });
   } finally {
     if (req.dbClient) req.dbClient.release();
@@ -172,6 +198,7 @@ app.get('/api/clientes-ofuscados', authenticateAndSetRLS, async (req, res) => {
 
     return res.status(500).json({
       error: 'Error consultando clientes',
+      code: error.code || null,
     });
   } finally {
     if (req.dbClient) req.dbClient.release();
