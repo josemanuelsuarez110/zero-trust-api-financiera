@@ -51,6 +51,17 @@ app.use(
 );
 
 app.use((req, res, next) => {
+  if (
+    req.path.startsWith('/api/auth/') ||
+    req.path === '/api/transacciones' ||
+    req.path === '/api/clientes-ofuscados'
+  ) {
+    res.setHeader(
+      'Cache-Control',
+      'no-store'
+    );
+  }
+
   res.setHeader(
     'X-Content-Type-Options',
     'nosniff'
