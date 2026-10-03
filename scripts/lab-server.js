@@ -40,6 +40,57 @@ const identities = new Map([
 
 const app = express();
 app.disable('x-powered-by');
+
+const { randomUUID } = require('node:crypto');
+
+app.use((req, res, next) => {
+  const requestId = randomUUID();
+  res.set('X-Request-ID', requestId);
+
+  res.on('finish', () => {
+    let event;
+
+    if (req.path === '/api/auth/login') {
+      event = res.statusCode === 200
+        ? 'login_success'
+        : 'login_rejected';
+    } else if (
+      req.path === '/api/transacciones' ||
+      req.path.startsWith('/api/transacciones/')
+    ) {
+      event = res.statusCode === 401 || res.statusCode === 403
+        ? 'authentication_rejected'
+        : res.statusCode === 404
+          ? 'resource_unavailable'
+          : res.statusCode >= 500
+            ? 'server_error'
+            : res.statusCode >= 400
+              ? 'request_rejected'
+              : 'transaction_read';
+    } else {
+      return;
+    }
+
+    console.log(JSON.stringify({
+      timestamp: new Date().toISOString(),
+      request_id: requestId,
+      event,
+      method: req.method,
+      route: req.path === '/api/auth/login'
+        ? '/api/auth/login'
+        : req.path === '/api/transacciones'
+          ? '/api/transacciones'
+          : '/api/transacciones/:id',
+      status: res.statusCode,
+      subject: req.subject || null,
+      organization_id: req.identity ? req.identity.org : null,
+      role: req.identity ? req.identity.role : null,
+    }));
+  });
+
+  next();
+});
+
 app.use(express.json({ limit: '8kb' }));
 app.use((_req, res, next) => {
   res.set('Cache-Control', 'no-store');
@@ -52,6 +103,9 @@ app.post('/api/auth/login', (req, res) => {
   if (!identities.has(username) || password !== 'demo-lab-only') {
     return res.status(401).json({ error: 'Credenciales inválidas' });
   }
+  req.subject = username;
+  req.identity = identities.get(username);
+
   const token = jwt.sign({}, process.env.JWT_SECRET, {
     subject: username,
     issuer: 'zt-lab',
@@ -76,6 +130,7 @@ app.use('/api/transacciones', (req, res, next) => {
     const identity = identities.get(claims.sub);
     if (!identity) throw new Error('Identidad desconocida');
     req.identity = identity;
+    req.subject = claims.sub;
     next();
   } catch {
     return res.status(403).json({ error: 'Token inválido o expirado' });
