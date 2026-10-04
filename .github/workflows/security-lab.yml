@@ -12,8 +12,15 @@ permissions:
 
 jobs:
   security-tests:
+    name: Security tests (pool ${{ matrix.pool_max }})
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        pool_max: [1, 4]
+    env:
+      LAB_POOL_MAX: '${{ matrix.pool_max }}'
 
     services:
       postgres:

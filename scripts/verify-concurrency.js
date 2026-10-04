@@ -80,7 +80,7 @@ async function main() {
 
   assert.equal(seen.size, 40);
   console.log('\nRESULTADO: 40 solicitudes concurrentes verificadas.');
-  console.log('Sin mezcla de datos en los casos probados; pool de una conexión.');
+  console.log('Sin mezcla de datos en los casos probados; comprobar el pool en el servidor.');
 }
 
 main().catch(error => {

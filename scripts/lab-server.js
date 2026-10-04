@@ -23,10 +23,15 @@ if (
   throw new Error('Configuración de laboratorio inválida');
 }
 
+const poolMax = Number(process.env.LAB_POOL_MAX || '1');
+if (!Number.isInteger(poolMax) || poolMax < 1 || poolMax > 4) {
+  throw new Error('LAB_POOL_MAX debe ser un entero entre 1 y 4');
+}
+
 const pool = new Pool({
   connectionString: db.toString(),
   ssl: false,
-  max: 1,
+  max: poolMax,
   connectionTimeoutMillis: 5000,
   statement_timeout: 5000,
 });

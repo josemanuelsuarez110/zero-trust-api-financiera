@@ -163,3 +163,21 @@ node scripts/verify-concurrency.js
 The database pool has one connection, so database transactions are
 serialized. This validates the tested HTTP overlap and connection reuse;
 it is not a multi-connection isolation test or a performance benchmark.
+
+## Configurable connection pool
+The local laboratory accepts LAB_POOL_MAX from 1 to 4,
+with a default of 1.
+
+To run with a maximum of four connections:
+LAB_POOL_MAX=4 node scripts/lab-server.js 2>&1 | tee -a logs/security-session.log
+
+On 2026-10-04, the local run with this configuration passed
+40 concurrent HTTP requests and six audit correlation checks.
+A subsequent PostgreSQL snapshot showed four idle connections.
+This snapshot does not establish simultaneous query execution.
+
+GitHub Actions is configured to run the security suite in
+separate jobs with pool limits of 1 and 4. Each job uses its
+own PostgreSQL service and synthetic fixtures.
+These checks validate the tested isolation scenarios;
+they are not a load benchmark.
