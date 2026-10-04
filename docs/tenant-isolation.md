@@ -115,15 +115,16 @@ All four HTTP demo identities use `demo-lab-only`. This is unrelated to the Post
 - Stop terminal A with Ctrl+C when finished. The database and local logs remain for later sessions; restarting the lab does not require recreating them.
 
 ### Continuous integration
-`.github/workflows/security-lab.yml` provisions disposable PostgreSQL 16, creates the restricted role, applies fixtures and runs all three suites with Node.js 24. CI uses disposable credentials, not local or production secrets. It runs on pushes to `security/tenant-isolation` and pull requests. It does not deploy the application.
+`.github/workflows/security-lab.yml` provisions disposable PostgreSQL 16, creates the restricted role, applies fixtures and runs the SQL, API, audit and concurrency suites plus the demonstration with Node.js 24. CI uses disposable credentials, not local or production secrets. It runs on pushes to `security/tenant-isolation` and pull requests. It does not deploy the application.
 
 ## Limitations
 Authentication uses fixed demo identities and a demo password.
 Database credentials are trusted server credentials: their holder
 can change the session context. These checks do not demonstrate
 protection against stolen database credentials or SQL injection.
-The tests do not cover multiple simultaneous database connections,
-token revocation, write operations or production deployment.
+Concurrent HTTP requests are tested with pool limits of 1 and 4;
+the suite does not measure overlapping database query execution.
+Token revocation, write operations and production deployment are not covered.
 No vulnerability in the published application was established.
 
 ## Automated audit event verification
@@ -160,9 +161,10 @@ and all 40 response request IDs were distinct.
 Run with the laboratory server active:
 node scripts/verify-concurrency.js
 
-The database pool has one connection, so database transactions are
-serialized. This validates the tested HTTP overlap and connection reuse;
-it is not a multi-connection isolation test or a performance benchmark.
+The default pool has one connection, so database transactions are
+serialized in that configuration. The suite also runs with a pool limit
+of four. It checks response isolation under concurrent HTTP requests,
+not database query overlap or performance.
 
 ## Configurable connection pool
 The local laboratory accepts LAB_POOL_MAX from 1 to 4,
@@ -181,3 +183,11 @@ separate jobs with pool limits of 1 and 4. Each job uses its
 own PostgreSQL service and synthetic fixtures.
 These checks validate the tested isolation scenarios;
 they are not a load benchmark.
+
+## CI evidence
+
+Both pool configurations passed for commit `4ac197830077ac91934abbe5d99fd64618be942d` on 2026-10-04:
+https://github.com/josemanuelsuarez110/zero-trust-api-financiera/actions/runs/37212795130
+
+Each job ran six SQL checks, fifteen API checks, six audit checks,
+the controlled demonstration and forty concurrent HTTP requests.

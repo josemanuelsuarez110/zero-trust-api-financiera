@@ -45,12 +45,12 @@ Each response has a request ID. The demonstration matches that ID to its audit e
 
 During development, I found that some authentication rejections were absent from the logs because the logger read the request path after mounted middleware had processed it. Capturing the original path corrected that issue, and I added regression checks for the audit events.
 
-The project has six SQL checks, fifteen API checks and six audit checks, with automated execution against disposable PostgreSQL in GitHub Actions. It uses demo authentication and does not establish production readiness, multi-connection concurrency safety or protection against stolen database credentials.”
+The project has six SQL checks, fifteen API checks and six audit checks, with automated execution against disposable PostgreSQL in GitHub Actions. CI also verifies forty concurrent HTTP requests with pool limits of one and four. It uses demo authentication and does not establish production readiness, exhaustive concurrency safety or protection against stolen database credentials.”
 
 ## Questions to prepare for
 
 - Why use 404? It avoids revealing whether a particular foreign transaction exists; the fixture, not the log alone, establishes what was tested.
-- Why transaction-local context? It scopes the organization and role settings to the current database transaction. Sequential reuse and concurrent HTTP requests are tested with a one-connection pool; multiple database connections are not yet covered.
+- Why transaction-local context? It scopes the organization and role settings to the current database transaction. Sequential reuse and concurrent HTTP requests are tested with pool limits of one and four. The tests check returned data, not simultaneous database query execution.
 - Can the database login change organization context? Yes. It is a trusted application credential. RLS here is not a defense against its compromise.
 - What did you actually fix? An audit visibility defect and verification scripts that could previously accept insufficient evidence. No production cross-tenant vulnerability was established.
 - What is next? Extend regression coverage and review identity lifecycle, concurrency and write authorization before considering production use.
