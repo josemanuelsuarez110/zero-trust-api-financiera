@@ -122,8 +122,8 @@ Authentication uses fixed demo identities and a demo password.
 Database credentials are trusted server credentials: their holder
 can change the session context. These checks do not demonstrate
 protection against stolen database credentials or SQL injection.
-The tests do not cover concurrent requests, token revocation,
-write operations or production deployment.
+The tests do not cover multiple simultaneous database connections,
+token revocation, write operations or production deployment.
 No vulnerability in the published application was established.
 
 ## Automated audit event verification
@@ -149,3 +149,17 @@ Covered cases:
 This regression test detects missing or incorrectly attributed
 events, including the previously corrected request-path issue.
 It does not establish log tamper resistance or centralized retention.
+
+## Concurrent HTTP requests
+
+On 2026-10-04, the local concurrency test passed 40 requests in
+five batches of eight simultaneous HTTP requests across four identities.
+Each response matched the expected transaction IDs and organization,
+and all 40 response request IDs were distinct.
+
+Run with the laboratory server active:
+node scripts/verify-concurrency.js
+
+The database pool has one connection, so database transactions are
+serialized. This validates the tested HTTP overlap and connection reuse;
+it is not a multi-connection isolation test or a performance benchmark.
