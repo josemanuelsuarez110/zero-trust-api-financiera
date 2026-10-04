@@ -1,6 +1,11 @@
-const BASE_URL =
-  process.env.BASE_URL ||
-  'https://zero-trust-api-financiera.vercel.app'
+const BASE_URL = process.env.BASE_URL
+
+if (!BASE_URL) {
+  console.error(
+    'Falta BASE_URL. Indica explícitamente el servidor de pruebas.'
+  )
+  process.exit(1)
+}
 
 async function login(username, password) {
   const response = await fetch(
@@ -120,8 +125,23 @@ async function gerenteTest() {
       auth.token
     )
 
-  const rows =
-    result.transacciones || []
+  const rows = result.transacciones
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error(
+      'Verificación inconclusa: se esperaba un arreglo no vacío de transacciones.'
+    )
+  }
+
+  if (rows.some(row =>
+    !row ||
+    !Number.isInteger(row.sucursal_id) ||
+    row.sucursal_id <= 0
+  )) {
+    throw new Error(
+      'Respuesta inválida: sucursal_id debe ser un entero positivo.'
+    )
+  }
 
   const branches =
     [
@@ -178,8 +198,23 @@ async function auditorTest() {
       auth.token
     )
 
-  const rows =
-    result.transacciones || []
+  const rows = result.transacciones
+
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new Error(
+      'Verificación inconclusa: se esperaba un arreglo no vacío de transacciones.'
+    )
+  }
+
+  if (rows.some(row =>
+    !row ||
+    !Number.isInteger(row.sucursal_id) ||
+    row.sucursal_id <= 0
+  )) {
+    throw new Error(
+      'Respuesta inválida: sucursal_id debe ser un entero positivo.'
+    )
+  }
 
   const branches =
     [
@@ -210,8 +245,8 @@ async function auditorTest() {
       '✓ RLS auditor regional permite visibilidad multi-sucursal'
     )
   } else {
-    console.warn(
-      '⚠ Auditor solo recibió una sucursal. Revisar si el dataset tiene otras sucursales o si la política RLS debe ampliarse.'
+    throw new Error(
+      'Verificación inconclusa: el auditor debe ver al menos dos sucursales del dataset de laboratorio.'
     )
   }
 }

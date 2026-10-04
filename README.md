@@ -2,6 +2,10 @@
 
 Security-focused financial API demonstrating JWT authentication, role context injection and PostgreSQL Row-Level Security (RLS).
 
+## Reproducible tenant isolation lab
+
+[Follow the full local setup and verification guide](docs/tenant-isolation.md) for the separate localhost laboratory: two organizations, PostgreSQL RLS, 15 API checks and 6 correlated audit checks, plus 6 SQL checks. GitHub Actions recreates the test environment with disposable data. The sections below describe the original application.
+
 ## Architecture
 
 Browser
@@ -62,9 +66,13 @@ Never commit their values to Git.
 
 ## Automated Security Verification
 
-Run:
+For the original application, explicitly choose the intended test server:
 
-npm run test:security
+```bash
+BASE_URL=http://127.0.0.1:3000 npm run test:security
+```
+
+This command expects the original demo identities and a populated branch dataset. It is not the tenant-lab suite; use the linked guide for the lab on port 3001.
 
 The test validates:
 

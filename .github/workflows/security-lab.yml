@@ -1,0 +1,146 @@
+name: Security laboratory
+
+on:
+  push:
+    branches:
+      - security/tenant-isolation
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  security-tests:
+    name: Security tests (pool ${{ matrix.pool_max }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        pool_max: [1, 4]
+    env:
+      LAB_POOL_MAX: '${{ matrix.pool_max }}'
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: zt_security_lab
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-admin-disposable
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d zt_security_lab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+
+      - name: Check JavaScript syntax
+        run: |
+          npm run check
+          node --check scripts/lab-server.js
+          node --check scripts/verify-lab.js
+          node --check scripts/verify-audit.js
+
+      - name: Prepare isolated database
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: postgres
+          PGDATABASE: zt_security_lab
+          PGPASSWORD: ci-admin-disposable
+        run: |
+          psql -X -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE zt_lab_app
+            LOGIN PASSWORD 'ci-app-disposable'
+            NOSUPERUSER NOCREATEDB NOCREATEROLE
+            NOREPLICATION NOBYPASSRLS;
+          REVOKE ALL ON DATABASE zt_security_lab FROM PUBLIC;
+          GRANT CONNECT ON DATABASE zt_security_lab TO zt_lab_app;
+          SQL
+          psql -X -v ON_ERROR_STOP=1 -f sql/001_lab_isolation.sql
+
+      - name: Verify SQL isolation
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: '5432'
+          PGUSER: zt_lab_app
+          PGDATABASE: zt_security_lab
+          PGPASSWORD: ci-app-disposable
+        run: |
+          mkdir -p logs
+          set -o pipefail
+          psql -X -v ON_ERROR_STOP=1 \
+            -f sql/002_verify_isolation.sql 2>&1 | tee logs/sql.txt
+
+      - name: Verify API and audit events
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          cat > .env.lab <<'ENV'
+          NODE_ENV=development
+          LAB_MODE=true
+          PORT=3001
+          DATABASE_URL=postgresql://zt_lab_app:ci-app-disposable@127.0.0.1:5432/zt_security_lab
+          ENV
+
+          node -e "console.log('JWT_SECRET=' + require('node:crypto').randomBytes(32).toString('hex'))" >> .env.lab
+
+          node scripts/lab-server.js > logs/security-session.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true; rm -f .env.lab' EXIT
+
+          ready=false
+          for attempt in {1..30}; do
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              echo "El servidor terminó antes de estar listo"
+              exit 1
+            fi
+            status=$(curl --max-time 2 -s -o /dev/null \
+              -w '%{http_code}' http://127.0.0.1:3001/api/transacciones || true)
+            if [ "$status" = "401" ]; then
+              ready=true
+              break
+            fi
+            sleep 1
+          done
+          if [ "$ready" != "true" ]; then
+            echo "El servidor no quedó disponible"
+            exit 1
+          fi
+
+          node scripts/verify-lab.js 2>&1 | tee logs/verification.txt
+          node scripts/verify-audit.js 2>&1 | tee logs/audit-verification.txt
+          node scripts/demo-security.js 2>&1 | tee logs/demo.txt
+          node scripts/verify-concurrency.js 2>&1 | tee logs/concurrency.txt
+
+      - name: Show diagnostic logs on failure
+        if: failure()
+        run: |
+          if [ -f logs/security-session.log ]; then
+            tail -n 80 logs/security-session.log
+          fi
