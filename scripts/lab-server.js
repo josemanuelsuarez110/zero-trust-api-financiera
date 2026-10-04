@@ -45,18 +45,19 @@ const { randomUUID } = require('node:crypto');
 
 app.use((req, res, next) => {
   const requestId = randomUUID();
+  const auditPath = req.path;
   res.set('X-Request-ID', requestId);
 
   res.on('finish', () => {
     let event;
 
-    if (req.path === '/api/auth/login') {
+    if (auditPath === '/api/auth/login') {
       event = res.statusCode === 200
         ? 'login_success'
         : 'login_rejected';
     } else if (
-      req.path === '/api/transacciones' ||
-      req.path.startsWith('/api/transacciones/')
+      auditPath === '/api/transacciones' ||
+      auditPath.startsWith('/api/transacciones/')
     ) {
       event = res.statusCode === 401 || res.statusCode === 403
         ? 'authentication_rejected'
@@ -76,9 +77,9 @@ app.use((req, res, next) => {
       request_id: requestId,
       event,
       method: req.method,
-      route: req.path === '/api/auth/login'
+      route: auditPath === '/api/auth/login'
         ? '/api/auth/login'
-        : req.path === '/api/transacciones'
+        : auditPath === '/api/transacciones'
           ? '/api/transacciones'
           : '/api/transacciones/:id',
       status: res.statusCode,
