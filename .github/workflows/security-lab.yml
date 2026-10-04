@@ -128,6 +128,7 @@ jobs:
 
           node scripts/verify-lab.js 2>&1 | tee logs/verification.txt
           node scripts/verify-audit.js 2>&1 | tee logs/audit-verification.txt
+          node scripts/demo-security.js 2>&1 | tee logs/demo.txt
 
       - name: Show diagnostic logs on failure
         if: failure()
