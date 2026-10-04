@@ -39,3 +39,27 @@ protection against stolen database credentials or SQL injection.
 The tests do not cover concurrent requests, token revocation,
 write operations or production deployment.
 No vulnerability in the published application was established.
+
+## Automated audit event verification
+Validated on 2026-10-04: six audit checks passed.
+
+Run the laboratory server with captured output:
+node scripts/lab-server.js 2>&1 | tee -a logs/security-session.log
+
+In a separate terminal:
+node scripts/verify-audit.js
+
+Each check correlates a fresh HTTP response's X-Request-ID
+with exactly one recorded event. It verifies event type,
+HTTP status, method, route, identity, organization, role,
+timestamp format and the allowed set of log fields.
+
+Covered cases:
+- Missing and invalid authentication tokens.
+- Rejected and successful login.
+- Unavailable transaction from another organization.
+- Successful transaction listing.
+
+This regression test detects missing or incorrectly attributed
+events, including the previously corrected request-path issue.
+It does not establish log tamper resistance or centralized retention.
